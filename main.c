@@ -52,6 +52,7 @@ void *memory_malloc(size_t size) {
         if (temp->free) {
             if (temp->size >= size) {
                 temp->size = size;
+                temp->free=0;
                 return (void *) ((char *) memPointer + pointerAdd);
             }
         }
@@ -61,7 +62,7 @@ void *memory_malloc(size_t size) {
         temp = temp->next;
     }
 
-    if (memory_manager.memory_size - pointerAdd < size)return NULL;
+    if (memory_manager.memory_size - pointerAdd -sizeOfBlock < size)return NULL;
     memoryChunk = (void *) ((char *) memPointer + pointerAdd);
     temp->next = memoryChunk;
     memoryChunk->next = NULL;
@@ -75,21 +76,17 @@ void *memory_malloc(size_t size) {
 }
 
 void memory_free(void *address) {
-    if (address == NULL)return;
+    if (address == NULL||memory_manager.first_memory_chunk==NULL)return;
     size_t sizeOfBlock = sizeof(struct memory_chunk_t);
-    struct memory_chunk_t *temp = memory_manager.first_memory_chunk;
-    void *memPointer = memory_manager.memory_start;
-    size_t pointerAdd = 0;
+    struct memory_chunk_t *memoryChunk  = memory_manager.first_memory_chunk;
+
 
     while (1) {
-        pointerAdd += sizeOfBlock;
-        if (address == (void *) ((char *) memPointer + pointerAdd))break;
-        pointerAdd += temp->size;
-        if (temp->next == NULL)return;
-        temp = temp->next;
+        if((void*)((char*)memoryChunk+sizeOfBlock)==address)break;
+        if(memoryChunk->next==NULL)return;
+        memoryChunk=memoryChunk->next;
     }
 
-    struct memory_chunk_t *memoryChunk = (void*)((char*)memPointer - sizeOfBlock);
     memoryChunk->free = 1;
     if (memoryChunk->next != NULL && memoryChunk->next->free) {
         memoryChunk->size += memoryChunk->next->size + sizeOfBlock;
@@ -108,6 +105,10 @@ void memory_free(void *address) {
     }
 
     if (memoryChunk->next == NULL) {
+        if(memoryChunk->prev==NULL){
+            memory_manager.first_memory_chunk=NULL;
+            return;
+        }
         memoryChunk->prev->next = NULL;
     }
 }
@@ -116,15 +117,52 @@ char heapMemory[HEAP_SIZE];
 
 
 int main() {
-    memory_init(&heapMemory, HEAP_SIZE);
 
-    int *a = memory_malloc(4);
-    int *b = memory_malloc(4);
-    int *c = memory_malloc(4);
-    *a = 4;
-    *b = 5;
-    *c = *b + *a;
-    printf("%d", *c);
+    srand (time(NULL));
+
+    char memory[63130];
+
+    char *ptr[370];
+    int ptr_state[370] = {0};
+
+    int is_allocated = 0;
+
+    memory_init(memory, 63130);
+
+    for (int i = 0; i < 370; ++i)
+    {
+        if (rand() % 100 < 66)
+        {
+            for (int j = 0; j < 370; ++j)
+                if (ptr_state[j] == 0)
+                {
+                    ptr_state[j] = 1;
+                    ptr[j] = memory_malloc(rand() % 100 + 50);
+                    is_allocated++;
+                    break;
+                }
+        }
+        else
+        {
+            if (is_allocated)
+            {
+                int to_free = rand() % is_allocated;
+                for (int j = 0; j < 370; ++j)
+                    if (ptr_state[j] == 1 && !(to_free--))
+                    {
+                        ptr_state[j] = 0;
+                        is_allocated--;
+                        memory_free(ptr[j]);
+                        break;
+                    }
+            }
+        }
+    }
 
 
+    for (int j = 0; j < 370; ++j)
+        if (ptr_state[j] == 1)
+            memory_free(ptr[j]);
+
+    return 0;
 }
