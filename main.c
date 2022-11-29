@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define HEAP_SIZE 512
 
