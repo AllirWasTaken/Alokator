@@ -28,94 +28,86 @@ void memory_init(void *address, size_t size) {
     memory_manager.memory_start = address;
 }
 
+size_t CheckSpaceBetweenChunks(struct memory_chunk_t *chunk){
+    if(chunk->next==NULL)return 0;
+    if(chunk+sizeof(struct memory_chunk_t)+chunk->size==chunk->next)return 0;
+    else{
+        size_t pointerAdd=0;
+        struct memory_chunk_t *temp=chunk->next;
+        char* pointer=(void*)chunk;
+        pointer+=sizeof(struct memory_chunk_t)+chunk->size;
+        while((void*)(pointer+pointerAdd)!=(void*)(temp))pointerAdd++;
+        return pointerAdd;
+    }
+}
 
 void *memory_malloc(size_t size) {
-    printf("Trying to allocate %d bytes\n",(int)size);
-    if (size < 1)return NULL;
-    if (memory_manager.memory_size == 0)return NULL;
+    printf("trying to allocate %d bytes\n",(int)size);
+    size_t sizeOfChunk=sizeof(struct memory_chunk_t);
+    if(size<1||size>memory_manager.memory_size-sizeOfChunk)return NULL;
 
-    size_t pointerAdd = 0;
-    size_t sizeOfBlock = sizeof(struct memory_chunk_t);
-    void *memPointer = memory_manager.memory_start;
-    struct memory_chunk_t *memoryChunk;
-
-    if (memory_manager.first_memory_chunk == NULL) {
-        if (size > memory_manager.memory_size - sizeOfBlock)return NULL;
-        memoryChunk = memory_manager.memory_start;
-        memoryChunk->size = size;
-        memoryChunk->next = NULL;
-        memoryChunk->prev = NULL;
-        memoryChunk->free = 0;
-        memory_manager.first_memory_chunk = memoryChunk;
-        return (void *) ((char *) memPointer + sizeOfBlock);
-    }
+    struct memory_chunk_t *newChunk=NULL;
     struct memory_chunk_t *temp;
-    temp = memory_manager.first_memory_chunk;
-    while (1) {
-        pointerAdd += sizeOfBlock;
-        if (temp->free) {
-            if (temp->size >= size) {
-                temp->size = size;
-                temp->free=0;
-                return (void *) ((char *) memPointer + pointerAdd);
+    size_t pointerAdd=0;
+    size_t between;
+
+    if(memory_manager.first_memory_chunk==NULL){
+        newChunk=memory_manager.memory_start;
+        newChunk->next=NULL;
+        newChunk->prev=NULL;
+        newChunk->size=size;
+        newChunk->free=0;
+        memory_manager.first_memory_chunk=newChunk;
+    }
+    else {
+        temp=memory_manager.first_memory_chunk;
+        while(1){
+            pointerAdd+=sizeOfChunk;
+            pointerAdd+=temp->size;
+            if(temp->next==NULL)break;
+            if(temp->free){
+                if(temp->size>=size){
+                    temp->size=size;
+                    temp->free=0;
+                    newChunk=temp;
+                    break;
+                }
+            }
+            between=CheckSpaceBetweenChunks(temp);
+            if(between!=0){
+                if(between>=sizeOfChunk+size){
+                    newChunk=(void*)((char*)memory_manager.memory_start+pointerAdd);
+                    newChunk->next=temp->next;
+                    newChunk->prev=temp;
+                    newChunk->prev->next=newChunk;
+                    newChunk->next->prev=newChunk;
+                    newChunk->size=size;
+                    newChunk->free=0;
+                    break;
+                }
+            }
+            else{
+                temp=temp->next;
             }
         }
-
-        pointerAdd += temp->size;
-        if (temp->next == NULL)break;
-        temp = temp->next;
     }
 
-    if (memory_manager.memory_size - pointerAdd -sizeOfBlock < size)return NULL;
-    memoryChunk = (void *) ((char *) memPointer + pointerAdd);
-    temp->next = memoryChunk;
-    memoryChunk->next = NULL;
-    memoryChunk->prev = temp;
-    memoryChunk->size = size;
-    memoryChunk->free = 0;
+    if(pointerAdd+size+sizeOfChunk<=memory_manager.memory_size&&newChunk==NULL){
+        newChunk=(void*)((char*)memory_manager.memory_start+pointerAdd);
+        newChunk->next=NULL;
+        newChunk->prev=temp;
+        newChunk->prev->next=newChunk;
+        newChunk->free=0;
+        newChunk->size=size;
+    }
 
-    pointerAdd += sizeOfBlock;
+    if(newChunk==NULL)return NULL;
+    else return (void*)newChunk+sizeOfChunk;
 
-    return (void *) ((char *) memPointer + pointerAdd);;
 }
 
 void memory_free(void *address) {
-    if (address == NULL||memory_manager.first_memory_chunk==NULL)return;
-    size_t sizeOfBlock = sizeof(struct memory_chunk_t);
-    struct memory_chunk_t *memoryChunk  = memory_manager.first_memory_chunk;
 
-
-    while (1) {
-        if((void*)((char*)memoryChunk+sizeOfBlock)==address)break;
-        if(memoryChunk->next==NULL)return;
-        memoryChunk=memoryChunk->next;
-    }
-
-    memoryChunk->free = 1;
-    printf("Freed %d bytes\n",(int)memoryChunk->size);
-    if (memoryChunk->next != NULL && memoryChunk->next->free) {
-        memoryChunk->size += memoryChunk->next->size + sizeOfBlock;
-        memoryChunk->next = memoryChunk->next->next;
-        if (memoryChunk->next != NULL) {
-            memoryChunk->next->prev = memoryChunk;
-        }
-    }
-    if (memoryChunk->prev != NULL && memoryChunk->prev->free) {
-        memoryChunk = memoryChunk->prev;
-        memoryChunk->size += memoryChunk->next->size + sizeOfBlock;
-        memoryChunk->next = memoryChunk->next->next;
-        if (memoryChunk->next != NULL) {
-            memoryChunk->next->prev = memoryChunk;
-        }
-    }
-
-    if (memoryChunk->next == NULL) {
-        if(memoryChunk->prev==NULL){
-            memory_manager.first_memory_chunk=NULL;
-            return;
-        }
-        memoryChunk->prev->next = NULL;
-    }
 }
 
 char heapMemory[HEAP_SIZE];
@@ -147,33 +139,62 @@ void StackStatus(){
 
 int main() {
 
+
     srand (time(NULL));
 
     char memory[63130];
-    char *ptr;
 
+    char *ptr[370];
+    int ptr_state[370] = {0};
+
+    int is_allocated = 0;
 
     memory_init(memory, 63130);
 
 
-    memory_malloc(76);
-    memory_malloc(74);
-    memory_malloc(82);
-    memory_malloc(135);
-    memory_malloc(68);
-    memory_malloc(108);
-    memory_malloc(58);
-    memory_malloc(105);
-    memory_malloc(119);
-    memory_malloc(69);
-    memory_malloc(91);
-    ptr=memory_malloc(64);
-    memory_malloc(95);
-    memory_malloc(146);
-    memory_free(ptr);
-    StackStatus();
-    memory_malloc(73);
-    StackStatus();
+    for (int i = 0; i < 370; ++i)
+    {
+        if (rand() % 100 < 66)
+        {
+            for (int j = 0; j < 370; ++j)
+                if (ptr_state[j] == 0)
+                {
+                    ptr_state[j] = 1;
+                    ptr[j] = memory_malloc(rand() % 100 + 50);
+                    is_allocated++;
+                    break;
+                }
+        }
+        else
+        {
+            if (is_allocated)
+            {
+                int to_free = rand() % is_allocated;
+                for (int j = 0; j < 370; ++j)
+                    if (ptr_state[j] == 1 && !(to_free--))
+                    {
+                        ptr_state[j] = 0;
+                        is_allocated--;
+                        memory_free(ptr[j]);
+                        break;
+                    }
+            }
+        }
+    }
+
+
+    for (int j = 0; j < 370; ++j)
+        if (ptr_state[j] == 1)
+            memory_free(ptr[j]);
+
+
+
+
+    struct memory_chunk_t *p1= (void*)((char*)memory_malloc(125)-32);
+    memory_malloc(51);
+    memory_malloc(54);
+    memory_malloc(138);
+    memory_free(p1);
 
 
     return 0;
