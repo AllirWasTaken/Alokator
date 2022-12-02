@@ -5,6 +5,7 @@
 
 #define HEAP_SIZE 512
 
+void StackStatus();
 
 struct memory_manager_t {
     void *memory_start;
@@ -29,6 +30,7 @@ void memory_init(void *address, size_t size) {
 
 
 void *memory_malloc(size_t size) {
+    printf("Trying to allocate %d bytes\n",(int)size);
     if (size < 1)return NULL;
     if (memory_manager.memory_size == 0)return NULL;
 
@@ -90,6 +92,7 @@ void memory_free(void *address) {
     }
 
     memoryChunk->free = 1;
+    printf("Freed %d bytes\n",(int)memoryChunk->size);
     if (memoryChunk->next != NULL && memoryChunk->next->free) {
         memoryChunk->size += memoryChunk->next->size + sizeOfBlock;
         memoryChunk->next = memoryChunk->next->next;
@@ -118,53 +121,60 @@ void memory_free(void *address) {
 char heapMemory[HEAP_SIZE];
 
 
+void StackStatus(){
+    printf("STACK STATUS\n");
+    size_t usedMemory=0;
+    struct memory_chunk_t *chunk;
+    if(memory_manager.first_memory_chunk==NULL)printf("Empty stack\n");
+    else{
+        chunk=memory_manager.first_memory_chunk;
+        while(chunk!=NULL){
+            usedMemory+=32;
+            if(chunk->free==0)usedMemory+=chunk->size;
+            printf("Block of address %p\n"
+                   "Prev %p\n"
+                   "Next %p\n"
+                   "Size %d\n"
+                   "IsFree %d\n",(void*)chunk,(void*)chunk->prev,(void*)chunk->next,(int)chunk->size,chunk->free);
+            chunk=chunk->next;
+        }
+    }
+    printf("Memory %d/%d\n %f%\n",
+           (int)usedMemory,(int)memory_manager.memory_size, (float)usedMemory/(float)memory_manager.memory_size*(float)100);
+    printf("END OF STATUS\n");
+}
+
+
 int main() {
 
     srand (time(NULL));
 
     char memory[63130];
+    char *ptr;
 
-    char *ptr[370];
-    int ptr_state[370] = {0};
-
-    int is_allocated = 0;
 
     memory_init(memory, 63130);
 
-    for (int i = 0; i < 370; ++i)
-    {
-        if (rand() % 100 < 66)
-        {
-            for (int j = 0; j < 370; ++j)
-                if (ptr_state[j] == 0)
-                {
-                    ptr_state[j] = 1;
-                    ptr[j] = memory_malloc(rand() % 100 + 50);
-                    is_allocated++;
-                    break;
-                }
-        }
-        else
-        {
-            if (is_allocated)
-            {
-                int to_free = rand() % is_allocated;
-                for (int j = 0; j < 370; ++j)
-                    if (ptr_state[j] == 1 && !(to_free--))
-                    {
-                        ptr_state[j] = 0;
-                        is_allocated--;
-                        memory_free(ptr[j]);
-                        break;
-                    }
-            }
-        }
-    }
 
+    memory_malloc(76);
+    memory_malloc(74);
+    memory_malloc(82);
+    memory_malloc(135);
+    memory_malloc(68);
+    memory_malloc(108);
+    memory_malloc(58);
+    memory_malloc(105);
+    memory_malloc(119);
+    memory_malloc(69);
+    memory_malloc(91);
+    ptr=memory_malloc(64);
+    memory_malloc(95);
+    memory_malloc(146);
+    memory_free(ptr);
+    StackStatus();
+    memory_malloc(73);
+    StackStatus();
 
-    for (int j = 0; j < 370; ++j)
-        if (ptr_state[j] == 1)
-            memory_free(ptr[j]);
 
     return 0;
 }
