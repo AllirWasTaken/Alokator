@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define HEAP_SIZE 512
-
 void StackStatus();
 
 struct memory_manager_t {
@@ -42,7 +40,7 @@ size_t CheckSpaceBetweenChunks(struct memory_chunk_t *chunk){
 }
 
 void *memory_malloc(size_t size) {
-    printf("trying to allocate %d bytes\n",(int)size);
+    //printf("trying to allocate %d bytes\n",(int)size);
     size_t sizeOfChunk=sizeof(struct memory_chunk_t);
     if(size<1||size>memory_manager.memory_size-sizeOfChunk)return NULL;
 
@@ -107,10 +105,47 @@ void *memory_malloc(size_t size) {
 }
 
 void memory_free(void *address) {
+    if(address==NULL)return;
+    if(memory_manager.first_memory_chunk==NULL)return;
+    size_t sizeOfChunk=sizeof(struct memory_chunk_t);
 
+    struct memory_chunk_t *tempChunk=memory_manager.first_memory_chunk;
+    struct memory_chunk_t *freeChunk=NULL;
+
+    while(tempChunk){
+        if((void*)((char*)tempChunk+sizeOfChunk)==address){
+            freeChunk=tempChunk;
+            break;
+        }
+        tempChunk=tempChunk->next;
+    }
+
+    if(!freeChunk)return;
+
+    freeChunk->free=1;
+    if(freeChunk->prev){
+        if(freeChunk->prev->free){
+            freeChunk->prev->size+=CheckSpaceBetweenChunks(freeChunk->prev);
+            freeChunk->prev->size+=freeChunk->size+sizeOfChunk;
+            freeChunk=freeChunk->prev;
+            freeChunk->next=freeChunk->next->next;
+            if(freeChunk->next)freeChunk->next->prev=freeChunk;
+        }
+    }
+    if(freeChunk->next){
+        freeChunk->size+= CheckSpaceBetweenChunks(freeChunk);
+        if(freeChunk->next->free){
+            freeChunk->size+=sizeOfChunk+freeChunk->next->size;
+            freeChunk->next=freeChunk->next->next;
+            if(freeChunk->next)freeChunk->next->prev=freeChunk;
+        }
+    }
+
+    if(freeChunk->next==NULL){
+        if(freeChunk->prev==NULL)memory_manager.first_memory_chunk=NULL;
+        else freeChunk->prev->next=NULL;
+    }
 }
-
-char heapMemory[HEAP_SIZE];
 
 
 void StackStatus(){
@@ -123,10 +158,10 @@ void StackStatus(){
         while(chunk!=NULL){
             usedMemory+=32;
             if(chunk->free==0)usedMemory+=chunk->size;
-            printf("Block of address %p\n"
-                   "Prev %p\n"
-                   "Next %p\n"
-                   "Size %d\n"
+            printf("Block of address %p <\n"
+                   "%p "
+                   "%p\n"
+                   "Size %d "
                    "IsFree %d\n",(void*)chunk,(void*)chunk->prev,(void*)chunk->next,(int)chunk->size,chunk->free);
             chunk=chunk->next;
         }
@@ -196,6 +231,26 @@ int main() {
     memory_malloc(138);
     memory_free(p1);
 
+    /*
 
+    char mem[256];
+
+    memory_init(&mem, 256);
+
+    struct memory_chunk_t *chunk= (void *)((char*)memory_malloc(9)-32);
+    char *a=(void*)((char*)chunk+32);
+    char *b=memory_malloc(11);
+    char *c=memory_malloc(7);
+    memory_free(b);
+    b=memory_malloc(5);
+    memory_free(b);
+    b=memory_malloc(11);
+    memory_free(a);
+    StackStatus();
+    memory_free(c);
+    StackStatus();
+    memory_free(b);
+    StackStatus();
+    */
     return 0;
 }
