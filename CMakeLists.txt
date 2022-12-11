@@ -3,4 +3,4 @@ project(Alokator C)
 
 set(CMAKE_C_STANDARD 99)
 
-add_executable(Alokator main.c custom_unistd.h memmanager.c)
+add_executable(Alokator main.c custom_unistd.h memmanager.c heap.cpp heap.c heap.h)

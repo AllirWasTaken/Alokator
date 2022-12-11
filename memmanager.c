@@ -85,8 +85,6 @@ void __attribute__((destructor)) memory_check(void)
         printf("    Pamięć zarezerwowana przez sbrk(): %lu bajtów\n", mm.brk - mm.start_brk);
     
     //if (first || last) {
-        printf("Naciśnij ENTER...");
-        fgetc(stdin);
     //}
 }
 
