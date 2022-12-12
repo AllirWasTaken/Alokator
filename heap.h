@@ -1,3 +1,6 @@
+#if !defined(_HEAP_H_)
+#define _HEAP_H_
+
 #include <stddef.h>
 
 enum pointer_type_t
@@ -19,5 +22,7 @@ void* heap_realloc(void* memblock, size_t count);
 void  heap_free(void* memblock);
 size_t   heap_get_largest_used_block_size(void);
 enum pointer_type_t get_pointer_type(const void* const pointer);
+int heap_validate(void);
 
 
+#endif // _HEAP_H_
